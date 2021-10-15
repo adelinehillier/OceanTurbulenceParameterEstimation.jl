@@ -88,14 +88,48 @@ end
 """
     column_ensemble_interior(observations::Vector{<:OneDimensionalTimeSeries}, field_name, time_indices::Vector, N_ens)
 
-Returns an `N_cases × N_ens` array of the interior of a field `field_name` defined on a 
+Returns an `N_cases × N_ens × Nz` array of the interior of a field `field_name` defined on a 
 `OneDimensionalEnsembleGrid` of size `N_cases × N_ens × Nz`, given a list of `OneDimensionalTimeSeries` objects
-containing the `N_cases` single-column fields at the corresponding time index in `time_indices`.
+containing the `N_cases` single-column fields at time index in `time_index`.
 """
-function column_ensemble_interior(observations::Vector{<:OneDimensionalTimeSeries}, field_name, time_indices::Vector, ensemble_size)
-    batch = @. get_interior(observations, field_name, time_indices)
+function column_ensemble_interior(observations::Vector{<:OneDimensionalTimeSeries}, field_name, time_index, ensemble_size)
+    batch = [ts.field_time_serieses[field_name][time_index] for ts in observations]
+
+    for ts in observations
+        
+    end
+
     batch = cat(batch..., dims = 2) # (n_batch, n_z)
     return cat([batch for i = 1:ensemble_size]..., dims = 1) # (ensemble_size, n_batch, n_z)
+end
+
+function set!(model, ts::Vector{<:OneDimensionalTimeSeries}, index=1)
+    # Set initial condition
+    for name in keys(fields(model))
+
+        model_field = fields(model)[name]
+
+        if name in keys(ts.field_time_serieses)
+            ts_field = ts.field_time_serieses[name][index]
+            set!(model_field, ts_field)
+        else
+            set!(model_field, 0) #default_initial_condition(ts, Val(name)))
+        end
+    end
+
+    return nothing
+end
+
+## should maybe include interpolation functionality
+function set!(field::AbstractField, data::AbstractArray)
+
+    arch = architecture(field)
+
+    # Reshape `data` to the size of `field`'s interior
+    reshaped_data = arch_array(arch, reshape(data, size(field)))
+
+    # Sets the interior of field `field` to values of `data`
+    field .= reshaped_data
 end
 
 struct FieldTimeSeriesCollector{G, D, F, T}
